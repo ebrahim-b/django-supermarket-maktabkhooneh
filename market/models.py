@@ -16,7 +16,7 @@ class Product(models.Model):
 
 
 class Customer(models.Model):
-    user = OneToOneField(User, on_delete = models.CASCADE)
+    user = models.OneToOneField(User, on_delete = models.CASCADE)
     phone = models.CharField(max_length=20)
     address = models.TextField()
     balance = models.PositiveIntegerField(default=20000, null=True)
@@ -26,12 +26,6 @@ class Customer(models.Model):
 
     def spend(self, amount):
         pass
-
-
-class OrderRow(models.Model):
-    product = models.ForeignKey(Product, on_delete=models.CASCADE)
-    order = models.ForeignKey(Order, on_delete=models.CASCADE)
-    amount = models.IntegerField()
 
 
 class Order(models.Model):
@@ -47,7 +41,7 @@ class Order(models.Model):
         (STATUS_SENT, "sent"),
     )
     
-    customer = models.ForiegnKey(Customer, on_delete=models.CASCADE)
+    customer = models.ForeignKey(Customer, on_delete=models.CASCADE)
     order_time = models.DateTimeField()
     total_price = models.IntegerField()
     status = models.IntegerField(choices=status_choices)
@@ -56,10 +50,10 @@ class Order(models.Model):
     def initiate(customer):
         pass
 
-    def add_product(self, product, amount):
+    def add_product(self, product:Product, amount:int):
         pass
 
-    def remove_product(self, product, amount=None):
+    def remove_product(self, product:Product, amount=None):
         pass
 
     def submit(self):
@@ -70,3 +64,9 @@ class Order(models.Model):
 
     def send(self):
         pass
+
+
+class OrderRow(models.Model):
+    product = models.ForeignKey(Product, on_delete=models.CASCADE)
+    order = models.ForeignKey(Order, on_delete=models.CASCADE)
+    amount = models.IntegerField()
