@@ -8,11 +8,20 @@ class Product(models.Model):
     price = models.PositiveIntegerField()
     inventory = models.PositiveIntegerField(default=0, null=True)
 
-    def increase_inventory(self, amount):
-        pass
+    def increase_inventory(self, amount:int):
+        if amount < 1:
+            raise Exception('Invalid input.')
+        self.inventory += amount
+        self.save()
 
-    def decrease_inventory(self, amount):
-        pass
+    def decrease_inventory(self, amount:int):
+        if amount < 1:
+            raise Exception('Invalid input.')
+        if self.inventory >= amount:
+            self.inventory -= amount
+            self.save()
+        else:
+            raise Exception("Product inventory is not enough.")
 
 
 class Customer(models.Model):
@@ -21,11 +30,14 @@ class Customer(models.Model):
     address = models.TextField()
     balance = models.PositiveIntegerField(default=20000, null=True)
 
-    def deposit(self, amount):
-        pass
+    def deposit(self, amount:int):
+        self.balance += amount
 
-    def spend(self, amount):
-        pass
+    def spend(self, amount:int):
+        if self.balance >= amount:
+            self.balance -= amount
+        else:
+            raise Exception("Customer balance is not enough!")
 
 
 class Order(models.Model):
@@ -42,28 +54,127 @@ class Order(models.Model):
     )
     
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE)
-    order_time = models.DateTimeField()
+    order_time = models.DateTimeField(auto_now_add=True)
     total_price = models.IntegerField()
     status = models.IntegerField(choices=status_choices)
 
     @staticmethod
-    def initiate(customer):
-        pass
+    def initiate(customer:Customer):
+        from django.utils import timezone
+        if Order.STATUS_SHOPPING in [item.status for item in Order.objects.filter(customer=customer)]:
+            return Order.objects.filter(status=Order.STATUS_SHOPPING).get(customer=customer)
+
+        order = Order(customer=customer,
+                      status=Order.STATUS_SHOPPING,
+                      order_time=timezone.now(), total_price=0)
+        order.save()
+        order.getRows()
+        return order
 
     def add_product(self, product:Product, amount:int):
-        pass
+        if amount <= 0:
+            raise Exception("Wrong operation.")
+        if amount > Product.objects.get(code=product.code).inventory:
+            raise Exception("Inventory is not enough.")
+        if product.code in [item.product.code for item in self.getRows()]:
+            order_row = self.getOrderRow(product)
+            order_row.amount += amount
+            if order_row.amount > Product.objects.get(code=product.code).inventory:
+                raise Exception("Inventory is not enough.")
+            order_row.save()
+        else:
+            order_row = OrderRow(product=product, amount=amount, order=self)
+            order_row.save()
+
+        from django.utils import timezone
+        self.order_time = timezone.now()
+        self.total_price += product.price * amount
+        self.save()
 
     def remove_product(self, product:Product, amount=None):
-        pass
+        if amount and amount <= 0 or not Product.objects.filter(code=product.code).exists():
+            raise Exception("Wrong operation.")
+
+        if product.code in [item.product.code for item in self.getRows()]:
+            order_row = self.getOrderRow(product)
+            if amount is None or order_row.amount == amount:
+                order_row.delete()
+                self.total_price -= product.price * order_row.amount
+            elif order_row.amount > amount:
+                order_row.amount -= amount
+                self.total_price -= product.price * amount
+                order_row.save()
+            else:
+                raise Exception("Entered amount is much than the amount in the card.")
+
+        else:
+            raise Exception("There is no such product in customer's card.")
+
+        from django.utils import timezone
+        self.order_time = timezone.now()
+        self.save()
 
     def submit(self):
-        pass
+        if self.status != Order.STATUS_SHOPPING:
+            raise Exception("This order is not submittable.")
+        if len(self.getRows()) == 0:
+            raise Exception("The cart is empty.")
+
+        temporarily_reduced = dict()
+
+        def recharge_inventories(max_):
+            for order_row_ in self.getRows():
+                order_row_.product.increase_inventory(temporarily_reduced[order_row_.id])
+
+        i = 0
+        for order_row in self.getRows():
+            if order_row.amount > order_row.product.inventory:
+                recharge_inventories(i)
+                raise Exception(
+                    """The product \"%s\" has been bought by other customers while you where shopping. 
+                    Now the product's inventory is %i numbers.""" \
+                    % (order_row.product.name, order_row.product.inventory))
+            else:
+                temporarily_reduced[order_row.id] = order_row.amount
+                order_row.product.decrease_inventory(order_row.amount)
+            i += 1
+
+
+        price_sum = sum([item.product.price * item.amount for item in self.getRows()])
+        customer_balance = self.customer.balance
+        if price_sum > customer_balance:
+            recharge_inventories(i)
+            raise Exception("Not enough balance.")
+
+        self.customer.balance -= price_sum
+        self.customer.save()
+        self.status = Order.STATUS_SUBMITTED
+        from django.utils import timezone
+        self.order_time = timezone.now()
+        self.save()
 
     def cancel(self):
-        pass
+        if self.status != Order.STATUS_SUBMITTED:
+            raise Exception("Not permitted operation.")
+
+        if self.status == Order.STATUS_SUBMITTED:
+            for order_row in self.getRows():
+                self.customer.balance += order_row.product.price * order_row.amount
+                self.customer.save()
+                order_row.product.increase_inventory(order_row.amount)
+
+        self.status = Order.STATUS_CANCELED
+        self.save()
 
     def send(self):
+        if self.status != Order.STATUS_SUBMITTED:
+            raise Exception("The order is not submitted or has been cancelled.")
+        self.status = Order.STATUS_SENT
+        self.save()
         pass
+
+    def getOrderRow(self, product: Product):
+        return self.orderrow_set.get(product=product)
 
 
 class OrderRow(models.Model):
