@@ -47,14 +47,14 @@ class Order(models.Model):
     STATUS_SENT = 4
 
     status_choices = (
-        (STATUS_SHOPPING, "shopping"),
-        (STATUS_SUBMITTED, "submitted"),
-        (STATUS_CANCELED, "canceled"),
-        (STATUS_SENT, "sent"),
+        (STATUS_SHOPPING, "در حال خرید"),
+        (STATUS_SUBMITTED, "ثبت شده"),
+        (STATUS_CANCELED, "لغو شده"),
+        (STATUS_SENT, "ارسال شده"),
     )
     
     customer = models.ForeignKey(Customer, on_delete=models.CASCADE)
-    order_time = models.DateTimeField(auto_now_add=True)
+    order_time = models.DateTimeField()
     total_price = models.IntegerField()
     status = models.IntegerField(choices=status_choices)
 
@@ -175,6 +175,10 @@ class Order(models.Model):
 
     def getOrderRow(self, product: Product):
         return self.orderrow_set.get(product=product)
+
+    def getRows(self):
+        self.rows = list(self.orderrow_set.all())
+        return self.rows
 
 
 class OrderRow(models.Model):
