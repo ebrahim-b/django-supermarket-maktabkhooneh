@@ -79,14 +79,14 @@ class Order(models.Model):
 
     def add_product(self, product:Product, amount:int):
         if amount <= 0:
-            raise Exception("Wrong operation.")
+            raise Exception("ورودی غیرقابل قبول می باشد")
         if amount > Product.objects.get(code=product.code).inventory:
-            raise Exception("Inventory is not enough.")
+            raise Exception("کالا به این میزان موجود نمی باشد")
         if product.code in [item.product.code for item in self.getRows()]:
             order_row = self.getOrderRow(product)
             order_row.amount += amount
             if order_row.amount > Product.objects.get(code=product.code).inventory:
-                raise Exception("Inventory is not enough.")
+                raise Exception("کالا به این میزان موجود نمی باشد")
             order_row.save()
         else:
             order_row = OrderRow(product=product, amount=amount, order=self)
