@@ -10,18 +10,18 @@ class Product(models.Model):
 
     def increase_inventory(self, amount:int):
         if amount < 1:
-            raise Exception('Invalid input.')
+            raise Exception('ورودی غیرقابل قبول می باشد')
         self.inventory += amount
         self.save()
 
     def decrease_inventory(self, amount:int):
         if amount < 1:
-            raise Exception('Invalid input.')
+            raise Exception('ورودی غیرقابل قبول می باشد')
         if self.inventory >= amount:
             self.inventory -= amount
             self.save()
         else:
-            raise Exception("Product inventory is not enough.")
+            raise Exception("به این میزان کالا موجود نمی باشد")
 
 
 class Customer(models.Model):
@@ -31,13 +31,17 @@ class Customer(models.Model):
     balance = models.PositiveIntegerField(default=20000, null=True)
 
     def deposit(self, amount:int):
+        if amount < 1:
+            raise Exception('ورودی غیرقابل قبول می باشد')
         self.balance += amount
 
     def spend(self, amount:int):
+        if amount < 1:
+            raise Exception('ورودی غیرقابل قبول می باشد')
         if self.balance >= amount:
             self.balance -= amount
         else:
-            raise Exception("Customer balance is not enough!")
+            raise Exception("موجودی مشتری کافی نمی باشد")
 
 
 class Order(models.Model):
@@ -61,14 +65,16 @@ class Order(models.Model):
     @staticmethod
     def initiate(customer:Customer):
         from django.utils import timezone
+
+        #if self.status
         if Order.STATUS_SHOPPING in [item.status for item in Order.objects.filter(customer=customer)]:
             return Order.objects.filter(status=Order.STATUS_SHOPPING).get(customer=customer)
 
-        order = Order(customer=customer,
-                      status=Order.STATUS_SHOPPING,
-                      order_time=timezone.now(), total_price=0)
+        self.status=Order.STATUS_SHOPPING
+        self.order_time=timezone.now()
+        self.total_price=0
         order.save()
-        order.getRows()
+        #order.getRows()
         return order
 
     def add_product(self, product:Product, amount:int):
